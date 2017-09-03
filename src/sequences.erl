@@ -42,7 +42,8 @@ init([]) ->
             event_handler => woody_event_handler_default,
             handlers      => [
                 get_handler_spec(sequences),
-                get_handler_spec(state_processor)]
+                get_handler_spec(state_processor)
+            ]
         }
     ),
     {ok, {
