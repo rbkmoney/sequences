@@ -51,8 +51,8 @@ end_per_suite(C) ->
 -spec init_per_testcase(atom(), config()) -> config().
 
 init_per_testcase(_Name, C) ->
-    Context = seq_client:new_context(),
-    [{context, Context} | C].
+    Client = seq_client:new(),
+    [{client, Client} | C].
 
 -spec end_per_testcase(atom(), config()) -> config().
 
@@ -61,19 +61,19 @@ end_per_testcase(_Name, _C) ->
 
 -spec get_current(term()) -> term().
 get_current(C) ->
-    Context = proplists:get_value(context, C),
+    Client = proplists:get_value(client, C),
     SeqId = get_sequence_id(),
-    0 = seq_client:get_current(SeqId, Context),
-    0 = seq_client:get_current(SeqId, Context),
-    _ = seq_client:get_next(SeqId, Context),
-    1 = seq_client:get_current(SeqId, Context).
+    0 = seq_client:get_current(SeqId, Client),
+    0 = seq_client:get_current(SeqId, Client),
+    _ = seq_client:get_next(SeqId, Client),
+    1 = seq_client:get_current(SeqId, Client).
 
 -spec get_next(term()) -> term().
 get_next(C) ->
-    Context = proplists:get_value(context, C),
+    Client = proplists:get_value(client, C),
     SeqId = get_sequence_id(),
-    1 = seq_client:get_next(SeqId, Context),
-    2 = seq_client:get_next(SeqId, Context).
+    1 = seq_client:get_next(SeqId, Client),
+    2 = seq_client:get_next(SeqId, Client).
 
 %%
 

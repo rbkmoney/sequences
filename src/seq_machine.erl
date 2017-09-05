@@ -2,8 +2,8 @@
 
 -include_lib("dmsl/include/dmsl_state_processing_thrift.hrl").
 
--export([get_current/3]).
--export([get_next/3]).
+-export([get_current/2]).
+-export([get_next/2]).
 
 %% State processor
 
@@ -13,56 +13,58 @@
 
 %%
 
+-define(NS, <<"sequences">>).
 -define(NIL, {nl, #msgpack_Nil{}}).
 -define(INIT, 0).
 
 -type id()          :: dmsl_base_thrift:'ID'().
--type ns()          :: dmsl_base_thrift:'Namespace'().
 -type context()     :: woody_context:ctx().
 
 %%
 
--type msgpack_value() :: dmsl_msgpack_thrift:'Value'().
+-spec get_next(id(), context()) ->
+    {ok, integer()}.
 
--spec get_next(ns(), id(), context()) ->
-    {ok, msgpack_value()}.
+get_next(Id, Context) ->
+    handle_result(get_next_(Id, Context)).
 
-get_next(Ns, Id, Context) ->
-    handle_result(get_next_(Ns, Id, Context)).
-
-get_next_(Ns, Id, Context) ->
-    Descriptor = prepare_descriptor(Ns, {id, Id}, #'HistoryRange'{}),
+get_next_(Id, Context) ->
+    Descriptor = construct_descriptor(?NS, {id, Id}),
     case call_automaton('Call', [Descriptor, ?NIL], Context) of
         {ok, Response} ->
             {ok, Response};
-        {error, #'MachineNotFound'{}} ->
-            {ok, ok} = start(Ns, Id, Context),
-            get_next_(Ns, Id, Context)
+        {error, Error} ->
+            handle_error({fun(X1, X2) -> get_next_(X1, X2) end, Id, Context}, Error)
     end.
 
--spec get_current(ns(), id(), context()) ->
-    {ok, msgpack_value()}.
+-spec get_current(id(), context()) ->
+    {ok, integer()}.
 
-get_current(Ns, Id, Context) ->
-    handle_result(get_current_(Ns, Id, Context)).
+get_current(Id, Context) ->
+    handle_result(get_current_(Id, Context)).
 
-get_current_(Ns, Id, Context) ->
-    Descriptor = prepare_descriptor(Ns, {id, Id}, #'HistoryRange'{}),
+get_current_(Id, Context) ->
+    Descriptor = construct_descriptor(?NS, {id, Id}),
     case call_automaton('GetMachine', [Descriptor], Context) of
         {ok, #'Machine'{aux_state = AuxState}} ->
             {ok, AuxState};
-        {error, #'MachineNotFound'{}} ->
-            {ok, ok} = start(Ns, Id, Context),
-            get_current_(Ns, Id, Context)
+        {error, Error} ->
+            handle_error({fun(X1, X2) -> get_current_(X1, X2) end, Id, Context}, Error)
     end.
 
 handle_result({ok, Result}) ->
     {ok, unmarshal(Result)}.
 
+handle_error({Function, Id, Context}, #'MachineAlreadyExists'{}) ->
+    Function(Id, Context);
+handle_error({Function, Id, Context}, #'MachineNotFound'{}) ->
+    {ok, ok} = start(Id, Context),
+    Function(Id, Context).
+
 %%
 
-start(Ns, Id, Context) ->
-    call_automaton('Start', [Ns, Id, ?NIL], Context).
+start(Id, Context) ->
+    call_automaton('Start', [?NS, Id, ?NIL], Context).
 
 call_automaton(Function, Args, Context) ->
     Request = {{dmsl_state_processing_thrift, 'Automaton'}, Function, Args},
@@ -75,11 +77,11 @@ call_automaton(Function, Args, Context) ->
             {error, Exception}
     end.
 
-prepare_descriptor(NS, Ref, Range) ->
+construct_descriptor(NS, Ref) ->
     #'MachineDescriptor'{
         ns = NS,
         ref = Ref,
-        range = Range
+        range = #'HistoryRange'{}
     }.
 
 %%
@@ -110,13 +112,13 @@ construct_change(State) ->
     }.
 
 init() ->
-    marshal(?INIT).
+    marshal([1, ?INIT]).
 
 process_call(CurrentValue) ->
-    marshal(unmarshal(CurrentValue) + 1).
+    marshal([1, unmarshal(CurrentValue) + 1]).
 
-marshal(Int) when is_integer(Int) ->
-    {i, Int}.
+marshal([1, Int]) when is_integer(Int) ->
+    {arr, [{i, 1}, {i, Int}]}.
 
-unmarshal({i, Int}) ->
+unmarshal({arr, [{i, 1}, {i, Int}]}) ->
     Int.
