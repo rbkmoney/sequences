@@ -1,6 +1,6 @@
 {application, sequences, [
     {description, "Sequence service"},
-    {vsn, "0"},
+    {vsn, "0.1.0"},
     {registered, []},
     {applications, [
         kernel,
