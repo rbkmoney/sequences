@@ -26,45 +26,30 @@
     {ok, integer()}.
 
 get_next(Id, Context) ->
-    handle_result(get_next_(Id, Context)).
-
-get_next_(Id, Context) ->
-    Descriptor = construct_descriptor(?NS, {id, Id}),
-    case call_automaton('Call', [Descriptor, ?NIL], Context) of
-        {ok, Response} ->
-            {ok, Response};
-        {error, Error} ->
-            handle_error({fun(X1, X2) -> get_next_(X1, X2) end, Id, Context}, Error)
-    end.
+    Descriptor = construct_descriptor({id, Id}),
+    handle_result(call_automaton_with_lazy_start('Call', [Descriptor, ?NIL], Context)).
 
 -spec get_current(id(), context()) ->
     {ok, integer()}.
 
 get_current(Id, Context) ->
-    handle_result(get_current_(Id, Context)).
-
-get_current_(Id, Context) ->
-    Descriptor = construct_descriptor(?NS, {id, Id}),
-    case call_automaton('GetMachine', [Descriptor], Context) of
-        {ok, #'Machine'{aux_state = AuxState}} ->
-            {ok, AuxState};
-        {error, Error} ->
-            handle_error({fun(X1, X2) -> get_current_(X1, X2) end, Id, Context}, Error)
-    end.
+    Descriptor = construct_descriptor({id, Id}),
+    {ok, #'Machine'{aux_state = AuxState}} = call_automaton_with_lazy_start('GetMachine', [Descriptor], Context),
+    handle_result({ok, AuxState}).
 
 handle_result({ok, Result}) ->
-    {ok, unmarshal(Result)}.
-
-handle_error({Function, Id, Context}, #'MachineAlreadyExists'{}) ->
-    Function(Id, Context);
-handle_error({Function, Id, Context}, #'MachineNotFound'{}) ->
-    {ok, ok} = start(Id, Context),
-    Function(Id, Context).
+    #{<<"sequence">> := Value} = unmarshal(Result),
+    {ok, Value}.
 
 %%
 
 start(Id, Context) ->
-    call_automaton('Start', [?NS, Id, ?NIL], Context).
+    case call_automaton('Start', [?NS, Id, ?NIL], Context) of
+        {ok, _} ->
+            ok;
+        {exception, #'MachineAlreadyExists'{}} ->
+            ok
+    end.
 
 call_automaton(Function, Args, Context) ->
     Request = {{dmsl_state_processing_thrift, 'Automaton'}, Function, Args},
@@ -74,12 +59,22 @@ call_automaton(Function, Args, Context) ->
         {ok, _} = Ok ->
             Ok;
         {exception, Exception} ->
-            {error, Exception}
+            {exception, Exception}
     end.
 
-construct_descriptor(NS, Ref) ->
+call_automaton_with_lazy_start(Function, Args, Context) ->
+    case call_automaton(Function, Args, Context) of
+        {ok, _} = Ok ->
+            Ok;
+        {exception, #'MachineNotFound'{}} ->
+            [#'MachineDescriptor'{ref = {id, Id}}|_] = Args,
+            ok = start(Id, Context),
+            call_automaton(Function, Args, Context)
+    end.
+
+construct_descriptor(Ref) ->
     #'MachineDescriptor'{
-        ns = NS,
+        ns = ?NS,
         ref = Ref,
         range = #'HistoryRange'{}
     }.
@@ -112,13 +107,17 @@ construct_change(State) ->
     }.
 
 init() ->
-    marshal([1, ?INIT]).
+    marshal(?INIT).
 
 process_call(CurrentValue) ->
-    marshal([1, unmarshal(CurrentValue) + 1]).
+    #{<<"sequence">> := UnmarshCurrentValue} = unmarshal(CurrentValue),
+    NextValue = UnmarshCurrentValue + 1,
+    marshal(NextValue).
 
-marshal([1, Int]) when is_integer(Int) ->
-    {arr, [{i, 1}, {i, Int}]}.
+%% Marshalling
 
-unmarshal({arr, [{i, 1}, {i, Int}]}) ->
-    Int.
+marshal(Int) when is_integer(Int) ->
+    {obj, #{{str, <<"sequence">>} => {arr, [{i, 1}, {i, Int}]}}}.
+
+unmarshal({obj, #{{str, <<"sequence">>} := {arr, [{i, 1}, {i, Int}]}}}) ->
+    #{<<"sequence">> => Int}.
