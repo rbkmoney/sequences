@@ -4,6 +4,8 @@
 -export([all/0]).
 -export([init_per_suite/1]).
 -export([end_per_suite/1]).
+-export([init_per_testcase/2]).
+-export([end_per_testcase/2]).
 
 -export([get_current/1]).
 -export([get_next/1]).
@@ -36,9 +38,6 @@ init_per_suite(C) ->
             {lager_common_test_backend, warning}
         ]}
     ]) ++ genlib_app:start_application_with(sequences, [
-        {service_urls, #{
-            'Sequences' => <<"sequences:8022/v1/sequences">>
-        }},
         {automaton_service_url, "http://machinegun:8022/v1/automaton"}
     ]),
     [{suite_apps, Apps} | C].
@@ -49,35 +48,34 @@ end_per_suite(C) ->
 
 %% tests
 
+-spec init_per_testcase(atom(), config()) -> config().
+
+init_per_testcase(_Name, C) ->
+    Context = seq_client:new_context(),
+    [{context, Context} | C].
+
+-spec end_per_testcase(atom(), config()) -> config().
+
+end_per_testcase(_Name, _C) ->
+    ok.
+
 -spec get_current(term()) -> term().
-get_current(_C) ->
+get_current(C) ->
+    Context = proplists:get_value(context, C),
     SeqId = get_sequence_id(),
-    0 = call('GetCurrent', [SeqId]),
-    0 = call('GetCurrent', [SeqId]),
-    _ = call('GetNext', [SeqId]),
-    1 = call('GetCurrent', [SeqId]).
+    0 = seq_client:get_current(SeqId, Context),
+    0 = seq_client:get_current(SeqId, Context),
+    _ = seq_client:get_next(SeqId, Context),
+    1 = seq_client:get_current(SeqId, Context).
 
 -spec get_next(term()) -> term().
-get_next(_C) ->
+get_next(C) ->
+    Context = proplists:get_value(context, C),
     SeqId = get_sequence_id(),
-    1 = call('GetNext', [SeqId]),
-    2 = call('GetNext', [SeqId]).
+    1 = seq_client:get_next(SeqId, Context),
+    2 = seq_client:get_next(SeqId, Context).
 
 %%
-
-call(Function, Args) ->
-    Call = {{dmsl_sequences_thrift, 'Sequences'}, Function, Args},
-    Opts = #{
-        url => <<"sequences:8022/v1/sequences">>,
-        event_handler => {woody_event_handler_default, undefined}
-    },
-    Context = woody_context:new(),
-    case woody_client:call(Call, Opts, Context) of
-        {ok, Response} ->
-            Response;
-        {exception, Exception} ->
-            throw(Exception)
-    end.
 
 get_sequence_id() ->
     integer_to_binary(erlang:system_time(micro_seconds)).

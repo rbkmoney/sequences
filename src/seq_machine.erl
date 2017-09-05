@@ -2,8 +2,8 @@
 
 -include_lib("dmsl/include/dmsl_state_processing_thrift.hrl").
 
--export([call/3]).
--export([get_state/3]).
+-export([get_current/3]).
+-export([get_next/3]).
 
 %% State processor
 
@@ -19,35 +19,45 @@
 -type id()          :: dmsl_base_thrift:'ID'().
 -type ns()          :: dmsl_base_thrift:'Namespace'().
 -type context()     :: woody_context:ctx().
--type aux_state()   :: dmsl_state_processing_thrift:'AuxState'().
 
 %%
 
--spec call(ns(), id(), context()) ->
-    {ok, aux_state()}.
+-type msgpack_value() :: dmsl_msgpack_thrift:'Value'().
 
-call(Ns, Id, Context) ->
+-spec get_next(ns(), id(), context()) ->
+    {ok, msgpack_value()}.
+
+get_next(Ns, Id, Context) ->
+    handle_result(get_next_(Ns, Id, Context)).
+
+get_next_(Ns, Id, Context) ->
     Descriptor = prepare_descriptor(Ns, {id, Id}, #'HistoryRange'{}),
     case call_automaton('Call', [Descriptor, ?NIL], Context) of
         {ok, Response} ->
             {ok, Response};
         {error, #'MachineNotFound'{}} ->
             {ok, ok} = start(Ns, Id, Context),
-            call(Ns, Id, Context)
+            get_next_(Ns, Id, Context)
     end.
 
--spec get_state(ns(), id(), context()) ->
-    {ok, aux_state()}.
+-spec get_current(ns(), id(), context()) ->
+    {ok, msgpack_value()}.
 
-get_state(Ns, Id, Context) ->
+get_current(Ns, Id, Context) ->
+    handle_result(get_current_(Ns, Id, Context)).
+
+get_current_(Ns, Id, Context) ->
     Descriptor = prepare_descriptor(Ns, {id, Id}, #'HistoryRange'{}),
     case call_automaton('GetMachine', [Descriptor], Context) of
         {ok, #'Machine'{aux_state = AuxState}} ->
             {ok, AuxState};
         {error, #'MachineNotFound'{}} ->
             {ok, ok} = start(Ns, Id, Context),
-            get_state(Ns, Id, Context)
+            get_current_(Ns, Id, Context)
     end.
+
+handle_result({ok, Result}) ->
+    {ok, unmarshal(Result)}.
 
 %%
 
@@ -81,26 +91,32 @@ prepare_descriptor(NS, Ref, Range) ->
 
 handle_function('ProcessSignal', [#'SignalArgs'{signal = {init, _}}], _Context, _Opts) ->
     {ok, #'SignalResult'{
-        change = get_change(init()),
+        change = construct_change(init()),
         action = #'ComplexAction'{}
     }};
 
 handle_function('ProcessCall', [#'CallArgs'{machine = #'Machine'{aux_state = CurrentAuxState}}], _Context, _Opts) ->
     NextAuxState = process_call(CurrentAuxState),
     {ok, #'CallResult'{
-        change = get_change(NextAuxState),
+        change = construct_change(NextAuxState),
         action = #'ComplexAction'{},
         response = NextAuxState
     }}.
 
-get_change(State) ->
+construct_change(State) ->
     #'MachineStateChange'{
         events = [],
         aux_state = State
     }.
 
 init() ->
-    seq_marshalling:marshal(?INIT).
+    marshal(?INIT).
 
 process_call(CurrentValue) ->
-    seq_marshalling:marshal(seq_marshalling:unmarshal(CurrentValue) + 1).
+    marshal(unmarshal(CurrentValue) + 1).
+
+marshal(Int) when is_integer(Int) ->
+    {i, Int}.
+
+unmarshal({i, Int}) ->
+    Int.

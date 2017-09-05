@@ -16,10 +16,7 @@
     {ok, woody:result()}.
 
 handle_function('GetCurrent', [SequenceId], Context, _Opts) ->
-    handle_result(seq_machine:get_state(?NS, SequenceId, Context));
+    seq_machine:get_current(?NS, SequenceId, Context);
 
 handle_function('GetNext', [SequenceId], Context, _Opts) ->
-    handle_result(seq_machine:call(?NS, SequenceId, Context)).
-
-handle_result({ok, Result}) ->
-    {ok, seq_marshalling:unmarshal(Result)}.
+    seq_machine:get_next(?NS, SequenceId, Context).
