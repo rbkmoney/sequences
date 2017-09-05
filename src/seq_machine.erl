@@ -14,6 +14,7 @@
 %%
 
 -define(NIL, {nl, #msgpack_Nil{}}).
+-define(INIT, 0).
 
 -type id()          :: dmsl_base_thrift:'ID'().
 -type ns()          :: dmsl_base_thrift:'Namespace'().
@@ -79,24 +80,27 @@ prepare_descriptor(NS, Ref, Range) ->
     {ok, term()}.
 
 handle_function('ProcessSignal', [#'SignalArgs'{signal = {init, _}}], _Context, _Opts) ->
-    {ok, AuxState} = seq_handler:init(),
-    Change = #'MachineStateChange'{
-        events = [],
-        aux_state = AuxState
-    },
     {ok, #'SignalResult'{
-        change = Change,
+        change = get_change(init()),
         action = #'ComplexAction'{}
     }};
 
 handle_function('ProcessCall', [#'CallArgs'{machine = #'Machine'{aux_state = CurrentAuxState}}], _Context, _Opts) ->
-    {ok, NextAuxState} = seq_handler:process_call(CurrentAuxState),
-    Change = #'MachineStateChange'{
-        events = [],
-        aux_state = NextAuxState
-    },
+    NextAuxState = process_call(CurrentAuxState),
     {ok, #'CallResult'{
-        change = Change,
+        change = get_change(NextAuxState),
         action = #'ComplexAction'{},
         response = NextAuxState
     }}.
+
+get_change(State) ->
+    #'MachineStateChange'{
+        events = [],
+        aux_state = State
+    }.
+
+init() ->
+    seq_marshalling:marshal(?INIT).
+
+process_call(CurrentValue) ->
+    seq_marshalling:marshal(seq_marshalling:unmarshal(CurrentValue) + 1).

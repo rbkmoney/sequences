@@ -5,8 +5,8 @@ SUBTARGETS = $(patsubst %,%/.git,$(SUBMODULES))
 UTILS_PATH := build_utils
 TEMPLATES_PATH := .
 
+# Name of the service
 SERVICE_NAME := sequences
-
 # Service image default tag
 SERVICE_IMAGE_TAG ?= $(shell git rev-parse HEAD)
 # The tag for service image to be pushed with
@@ -16,27 +16,19 @@ SERVICE_IMAGE_PUSH_TAG ?= $(SERVICE_IMAGE_TAG)
 BASE_IMAGE_NAME := service_erlang
 BASE_IMAGE_TAG := 13454a94990acb72f753623ec13599a9f6f4f852
 
-## Variables required for utils_container.mk
-
 # Build image tag to be used
-BUILD_IMAGE_TAG := 4799280a02cb73761a3ba3641285aac8ec4ec482
+BUILD_IMAGE_TAG := 317d28640a5dd2ec6e732d81283628d8ad3f3f52
 
-BASE_IMAGE := "$(ORG_NAME)/build:latest"
-RELNAME := sequences
-
-TAG = latest
-IMAGE_NAME = "$(ORG_NAME)/$(RELNAME):$(TAG)"
-
-CALL_ANYWHERE := submodules rebar-update compile xref lint dialyze start devrel release clean distclean
+CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean
 
 CALL_W_CONTAINER := $(CALL_ANYWHERE) test
-
-.PHONY: $(CALL_W_CONTAINER) all containerize push $(UTIL_TARGETS)
 
 all: compile
 
 -include $(UTILS_PATH)/make_lib/utils_container.mk
 -include $(UTILS_PATH)/make_lib/utils_image.mk
+
+.PHONY: $(CALL_W_CONTAINER)
 
 # CALL_ANYWHERE
 $(SUBTARGETS): %/.git: %
@@ -66,15 +58,15 @@ start: submodules
 devrel: submodules
 	$(REBAR) release
 
-release: submodules distclean
+release: distclean
 	$(REBAR) as prod release
 
 clean:
 	$(REBAR) clean
 
 distclean:
-	$(REBAR) clean -a
-	rm -rfv _build
+	$(REBAR) clean
+	rm -rf _build
 
 # CALL_W_CONTAINER
 test: submodules
