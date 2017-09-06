@@ -37,8 +37,7 @@ get_current(Id, Context) ->
     get_sequence_value(AuxState).
 
 get_sequence_value(AuxState) ->
-    #{sequence := Value} = unmarshal(AuxState),
-    Value.
+    unmarshal(AuxState).
 
 %%
 
@@ -115,14 +114,13 @@ init() ->
     marshal(?INIT).
 
 process_call(CurrentValue) ->
-    #{sequence := UnmarshCurrentValue} = unmarshal(CurrentValue),
-    NextValue = UnmarshCurrentValue + 1,
+    NextValue = unmarshal(CurrentValue) + 1,
     marshal(NextValue).
 
 %% Marshalling
 
 marshal(Int) when is_integer(Int) ->
-    {arr, [{i, 1}, {obj, #{{str, <<"sequence">>} => {i, Int}}}]}.
+    {arr, [{i, 1}, {i, Int}]}.
 
-unmarshal({arr, [{i, 1}, {obj, #{{str, <<"sequence">>} := {i, Int}}}]}) ->
-    #{sequence => Int}.
+unmarshal({arr, [{i, 1},  {i, Int}]}) ->
+    Int.
