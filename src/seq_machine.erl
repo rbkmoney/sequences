@@ -23,23 +23,21 @@
 %%
 
 -spec get_next(id(), context()) ->
-    {ok, integer()}.
+    integer().
 
 get_next(Id, Context) ->
-    Descriptor = construct_descriptor({id, Id}),
-    handle_result(call_automaton_with_lazy_start('Call', [Descriptor, ?NIL], Context)).
+    handle_result(call_automaton_with_lazy_start('Call', Id, [?NIL], Context)).
 
 -spec get_current(id(), context()) ->
-    {ok, integer()}.
+    integer().
 
 get_current(Id, Context) ->
-    Descriptor = construct_descriptor({id, Id}),
-    {ok, #'Machine'{aux_state = AuxState}} = call_automaton_with_lazy_start('GetMachine', [Descriptor], Context),
+    {ok, #'Machine'{aux_state = AuxState}} = call_automaton_with_lazy_start('GetMachine', Id, Context),
     handle_result({ok, AuxState}).
 
 handle_result({ok, Result}) ->
     #{<<"sequence">> := Value} = unmarshal(Result),
-    {ok, Value}.
+    Value.
 
 %%
 
@@ -62,14 +60,18 @@ call_automaton(Function, Args, Context) ->
             {exception, Exception}
     end.
 
-call_automaton_with_lazy_start(Function, Args, Context) ->
-    case call_automaton(Function, Args, Context) of
+call_automaton_with_lazy_start(Function, Id, Context) ->
+    call_automaton_with_lazy_start(Function, Id, [], Context).
+
+call_automaton_with_lazy_start(Function, Id, Args, Context) ->
+    Descriptor = construct_descriptor({id, Id}),
+    FullArgs = [Descriptor|Args],
+    case call_automaton(Function, FullArgs, Context) of
         {ok, _} = Ok ->
             Ok;
         {exception, #'MachineNotFound'{}} ->
-            [#'MachineDescriptor'{ref = {id, Id}}|_] = Args,
             ok = start(Id, Context),
-            call_automaton(Function, Args, Context)
+            call_automaton(Function, FullArgs, Context)
     end.
 
 construct_descriptor(Ref) ->
@@ -117,7 +119,7 @@ process_call(CurrentValue) ->
 %% Marshalling
 
 marshal(Int) when is_integer(Int) ->
-    {obj, #{{str, <<"sequence">>} => {arr, [{i, 1}, {i, Int}]}}}.
+    {arr, [{i, 1}, {obj, #{{str, <<"sequence">>} => {i, Int}}}]}.
 
-unmarshal({obj, #{{str, <<"sequence">>} := {arr, [{i, 1}, {i, Int}]}}}) ->
+unmarshal({arr, [{i, 1}, {obj, #{{str, <<"sequence">>} := {i, Int}}}]}) ->
     #{<<"sequence">> => Int}.

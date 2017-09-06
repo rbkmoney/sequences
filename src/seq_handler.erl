@@ -14,7 +14,9 @@
     {ok, woody:result()}.
 
 handle_function('GetCurrent', [SequenceId], Context, _Opts) ->
-    seq_machine:get_current(SequenceId, Context);
+    Value = seq_machine:get_current(SequenceId, Context),
+    {ok, Value};
 
 handle_function('GetNext', [SequenceId], Context, _Opts) ->
-    seq_machine:get_next(SequenceId, Context).
+    Value = seq_machine:get_next(SequenceId, Context),
+    {ok, Value}.
