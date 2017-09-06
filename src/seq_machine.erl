@@ -26,17 +26,18 @@
     integer().
 
 get_next(Id, Context) ->
-    handle_result(call_automaton_with_lazy_start('Call', Id, [?NIL], Context)).
+    {ok, AuxState} = call_automaton_with_lazy_start('Call', Id, [?NIL], Context),
+    get_sequence_value(AuxState).
 
 -spec get_current(id(), context()) ->
     integer().
 
 get_current(Id, Context) ->
     {ok, #'Machine'{aux_state = AuxState}} = call_automaton_with_lazy_start('GetMachine', Id, Context),
-    handle_result({ok, AuxState}).
+    get_sequence_value(AuxState).
 
-handle_result({ok, Result}) ->
-    #{<<"sequence">> := Value} = unmarshal(Result),
+get_sequence_value(AuxState) ->
+    #{sequence := Value} = unmarshal(AuxState),
     Value.
 
 %%
@@ -48,6 +49,10 @@ start(Id, Context) ->
         {exception, #'MachineAlreadyExists'{}} ->
             ok
     end.
+
+call_automaton(Function, Id, Args, Context) ->
+    Descriptor = construct_descriptor({id, Id}),
+    call_automaton(Function, [Descriptor|Args], Context).
 
 call_automaton(Function, Args, Context) ->
     Request = {{dmsl_state_processing_thrift, 'Automaton'}, Function, Args},
@@ -64,14 +69,12 @@ call_automaton_with_lazy_start(Function, Id, Context) ->
     call_automaton_with_lazy_start(Function, Id, [], Context).
 
 call_automaton_with_lazy_start(Function, Id, Args, Context) ->
-    Descriptor = construct_descriptor({id, Id}),
-    FullArgs = [Descriptor|Args],
-    case call_automaton(Function, FullArgs, Context) of
+    case call_automaton(Function, Id, Args, Context) of
         {ok, _} = Ok ->
             Ok;
         {exception, #'MachineNotFound'{}} ->
             ok = start(Id, Context),
-            call_automaton(Function, FullArgs, Context)
+            call_automaton(Function, Id, Args, Context)
     end.
 
 construct_descriptor(Ref) ->
@@ -112,7 +115,7 @@ init() ->
     marshal(?INIT).
 
 process_call(CurrentValue) ->
-    #{<<"sequence">> := UnmarshCurrentValue} = unmarshal(CurrentValue),
+    #{sequence := UnmarshCurrentValue} = unmarshal(CurrentValue),
     NextValue = UnmarshCurrentValue + 1,
     marshal(NextValue).
 
@@ -122,4 +125,4 @@ marshal(Int) when is_integer(Int) ->
     {arr, [{i, 1}, {obj, #{{str, <<"sequence">>} => {i, Int}}}]}.
 
 unmarshal({arr, [{i, 1}, {obj, #{{str, <<"sequence">>} := {i, Int}}}]}) ->
-    #{<<"sequence">> => Int}.
+    #{sequence => Int}.
