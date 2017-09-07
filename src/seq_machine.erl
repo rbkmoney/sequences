@@ -1,6 +1,6 @@
 -module(seq_machine).
 
--include_lib("dmsl/include/dmsl_state_processing_thrift.hrl").
+-include_lib("mg_proto/include/mg_proto_state_processing_thrift.hrl").
 
 -export([get_current/2]).
 -export([get_next/2]).
@@ -17,7 +17,7 @@
 -define(NIL, {nl, #msgpack_Nil{}}).
 -define(INIT, 0).
 
--type id()          :: dmsl_base_thrift:'ID'().
+-type id()          :: mg_proto_base_thrift:'ID'().
 -type context()     :: woody_context:ctx().
 
 %%
@@ -41,7 +41,7 @@ get_sequence_value(AuxState) ->
 
 %%
 
-start(Id, Context) ->
+ensure_started(Id, Context) ->
     case call_automaton('Start', [?NS, Id, ?NIL], Context) of
         {ok, _} ->
             ok;
@@ -54,15 +54,10 @@ call_automaton(Function, Id, Args, Context) ->
     call_automaton(Function, [Descriptor|Args], Context).
 
 call_automaton(Function, Args, Context) ->
-    Request = {{dmsl_state_processing_thrift, 'Automaton'}, Function, Args},
+    Request = {{mg_proto_state_processing_thrift, 'Automaton'}, Function, Args},
     {ok, URL} = application:get_env(sequences, automaton_service_url),
     Opts = #{url => URL, event_handler => {woody_event_handler_default, undefined}},
-    case woody_client:call(Request, Opts, Context) of
-        {ok, _} = Ok ->
-            Ok;
-        {exception, Exception} ->
-            {exception, Exception}
-    end.
+    woody_client:call(Request, Opts, Context).
 
 call_automaton_with_lazy_start(Function, Id, Context) ->
     call_automaton_with_lazy_start(Function, Id, [], Context).
@@ -72,7 +67,7 @@ call_automaton_with_lazy_start(Function, Id, Args, Context) ->
         {ok, _} = Ok ->
             Ok;
         {exception, #'MachineNotFound'{}} ->
-            ok = start(Id, Context),
+            ok = ensure_started(Id, Context),
             call_automaton(Function, Id, Args, Context)
     end.
 

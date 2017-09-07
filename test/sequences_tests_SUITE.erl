@@ -10,8 +10,6 @@
 -export([get_current/1]).
 -export([get_next/1]).
 
--include_lib("dmsl/include/dmsl_sequences_thrift.hrl").
-
 %% tests descriptions
 
 -type config() :: [{atom(), term()}].

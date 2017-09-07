@@ -2,8 +2,6 @@
 
 %% Woody handler
 
--include_lib("dmsl/include/dmsl_sequences_thrift.hrl").
-
 -behaviour(woody_server_thrift_handler).
 
 -export([handle_function/4]).
