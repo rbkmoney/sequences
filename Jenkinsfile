@@ -17,5 +17,5 @@ build('sequences', 'docker-host', finalHook) {
     pipeErlangService = load("${env.JENKINS_LIB}/pipeErlangService.groovy")
   }
 
-  pipeErlangService.run(runInParallel = true) 
+  pipeErlangService.runPipe(runInParallel = true) 
 }
