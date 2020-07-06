@@ -17,21 +17,5 @@ build('sequences', 'docker-host', finalHook) {
     pipeErlangService = load("${env.JENKINS_LIB}/pipeErlangService.groovy")
   }
 
-  //pipeErlangService.runPipe(false,true)
-            runStage('compile') {
-                withGithubPrivkey {
-                    sh 'make wc_compile'
-                }
-            }
-   parallel lint: { 
-            sh 'make wc_lint'
-   }, xref: {
-            sh 'make wc_xref'
-        }, dialyze: {
-            withDialyzerCache() {
-                sh 'make wc_dialyze'
-            }
-        }, test: {
-                sh "make wdeps_test"
-        }
+  pipeErlangService.runPipe(false,true)
 } 
