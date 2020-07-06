@@ -14,8 +14,9 @@ build('sequences', 'docker-host', finalHook) {
   def pipeErlangService
   runStage('load pipeline') {
     env.JENKINS_LIB = "build_utils/jenkins_lib"
+    env.SH_TOOLS = "build_utils/sh"
     pipeErlangService = load("${env.JENKINS_LIB}/pipeErlangService.groovy")
   }
 
-  pipeErlangService.runPipe(false,true)
+  pipeErlangService.runPipe(true,true)
 } 
