@@ -41,7 +41,7 @@ build('sequences', 'docker-host', finalHook) {
             },
             runStage('test') {
                         sh "make wdeps_test"
-            }
+            }]
        parallel checks    
     }
 } 
