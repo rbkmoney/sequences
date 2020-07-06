@@ -26,27 +26,26 @@ build('sequences', 'docker-host', finalHook) {
                     sh 'make wc_compile'
                 }
             }
-    stage('Parallel') {
-        failFast true
+    runStage('Parallel') {
         parallel {
-            stage('lint') {
+            runStage('lint') {
                 steps {
                     sh 'make wc_lint'
                 }
             }
-            stage('xref') {
+            runStage('xref') {
                 steps {
                     sh 'make wc_xref'
                 }
             }
-            stage('dialyze') {
+            runStage('dialyze') {
                 steps {
                     withDialyzerCache() {
                         sh 'make wc_dialyze'
                     }
                 }
             }
-            stage('test') {
+            runStage('test') {
                 steps {
                         sh "make wdeps_test"
                 }
